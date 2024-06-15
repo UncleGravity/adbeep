@@ -26,6 +26,44 @@ export function ADB() {
   const [currentTime, setCurrentTime] = useState(0);
   const [selectedTrack, setSelectedTrack] = useState<number>(0);
 
+  const demoFiles = [
+    "1up.mid",
+    "death.mid",
+    "ending.mid",
+    "game-over.mid",
+    "zelda-idk.mid"
+  ];
+
+  const [selectedDemoFile, setSelectedDemoFile] = useState("zelda-idk.mid");
+
+  const loadMidiFile = useCallback(async (filePath: string) => {
+    const response = await fetch(filePath);
+    const arrayBuffer = await response.arrayBuffer();
+    const currentMidi = new Midi(arrayBuffer);
+    setMidi(currentMidi);
+
+    console.log("TRACKS: ", currentMidi.tracks);
+
+    // Find the first non-empty track
+    const firstNonEmptyTrackIndex = currentMidi.tracks.findIndex(track => track.notes.length > 0);
+    if (firstNonEmptyTrackIndex !== -1) {
+      const sequence = convertMidiToSequence(currentMidi.tracks[firstNonEmptyTrackIndex].notes);
+      setSequence(sequence);
+      setSelectedTrack(firstNonEmptyTrackIndex);
+      console.log(`Auto-selected Track: ${firstNonEmptyTrackIndex}`);
+      console.log(sequence);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Load the selected demo MIDI file on component mount or when selectedDemoFile changes
+    loadMidiFile(`/midi/${selectedDemoFile}`);
+  }, [loadMidiFile, selectedDemoFile]);
+
+  const handleDemoFileChange = (value: string) => {
+    setSelectedDemoFile(value);
+  };
+
   const handleConnectClick = async () => {
     if (device) {
       console.log("Device already connected");
@@ -82,25 +120,6 @@ export function ADB() {
       console.log("process not ready");
     }
   };
-
-  const loadMidiFile = useCallback(async (filePath: string) => {
-    const response = await fetch(filePath);
-    const arrayBuffer = await response.arrayBuffer();
-    const currentMidi = new Midi(arrayBuffer);
-    setMidi(currentMidi);
-
-    console.log("TRACKS: ", currentMidi.tracks);
-
-    // Find the first non-empty track
-    const firstNonEmptyTrackIndex = currentMidi.tracks.findIndex(track => track.notes.length > 0);
-    if (firstNonEmptyTrackIndex !== -1) {
-      const sequence = convertMidiToSequence(currentMidi.tracks[firstNonEmptyTrackIndex].notes);
-      setSequence(sequence);
-      setSelectedTrack(firstNonEmptyTrackIndex);
-      console.log(`Auto-selected Track: ${firstNonEmptyTrackIndex}`);
-      console.log(sequence);
-    }
-  }, []);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -167,10 +186,25 @@ export function ADB() {
             {device && <p className="text-green-600">Selected device: {device.serial}</p>}
 
             <Button id="send-sequence-button" onClick={handleSendSequenceClick} disabled={!ready || isSending} className="mb-4 w-full">Send Sequence</Button>
-            <p>Current time: {currentTime}</p>
-            <p>Midi duration: {midi?.duration}</p>
+            {/* <p>Current time: {currentTime}</p>
+            <p>Midi duration: {midi?.duration}</p> */}
 
-            <div {...getRootProps()} className={cn('h-32 p-4 border-dashed border-2 rounded-md mb-4 flex items-center justify-center', isDragActive ? 'border-blue-500 bg-blue-100' : 'border-gray-300', { 'cursor-pointer': device })}>
+            <h3 className="text-lg font-bold">Select MIDI File</h3>
+            <h4 className="text-sm text-gray-500 mb-2">Select one of the example files, or upload your own below</h4>
+            <Select value={selectedDemoFile} onValueChange={handleDemoFileChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Demo MIDI File" />
+              </SelectTrigger>
+              <SelectContent>
+                {demoFiles.map((file, index) => (
+                  <SelectItem key={index} value={file}>
+                    {file}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div {...getRootProps()} className={cn('h-32 p-4 border-dashed border-2 rounded-md my-4 flex items-center justify-center', isDragActive ? 'border-blue-500 bg-blue-100' : 'border-gray-300', { 'cursor-pointer': device })}>
               <input {...getInputProps()} />
               <p className="text-sm text-gray-500 text-center">
                 {midiFileName ? midiFileName : 'Drag & drop a MIDI file here, or click to select one'}

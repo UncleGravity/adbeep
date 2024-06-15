@@ -204,7 +204,7 @@ export function ADB() {
               </SelectContent>
             </Select>
 
-            <div {...getRootProps()} className={cn('h-32 p-4 border-dashed border-2 rounded-md my-4 flex items-center justify-center', isDragActive ? 'border-blue-500 bg-blue-100' : 'border-gray-300', { 'cursor-pointer': device })}>
+            <div {...getRootProps()} className={cn('h-32 p-4 border-dashed border-2 rounded-md my-4 flex items-center justify-center cursor-pointer', isDragActive ? 'border-blue-500 bg-blue-100' : 'border-gray-300')}>
               <input {...getInputProps()} />
               <p className="text-sm text-gray-500 text-center">
                 {midiFileName ? midiFileName : 'Drag & drop a MIDI file here, or click to select one'}

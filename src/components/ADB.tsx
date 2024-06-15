@@ -1,11 +1,11 @@
 import { useCallback, useState, useRef, useEffect } from "react";
 import { useDropzone } from 'react-dropzone';
-import { Midi, Note } from '@tonejs/midi';
+import { Midi } from '@tonejs/midi';
 import useAdbDevice from "../hooks/useAdbDevice";
-import { ReadableWritablePair, WritableStream, DecodeUtf8Stream, Consumable, WritableStreamDefaultWriter } from "@yume-chan/stream-extra";
+import { WritableStream, DecodeUtf8Stream, Consumable, WritableStreamDefaultWriter } from "@yume-chan/stream-extra";
 import { Adb, AdbSubprocessProtocol } from "@yume-chan/adb";
 import { Button } from "@/components/ui/button"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { convertMidiToSequence, MARIO_THEME } from "@/lib/utils";
@@ -25,16 +25,6 @@ export function ADB() {
   const [isSending, setIsSending] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [selectedTrack, setSelectedTrack] = useState<number>(0);
-
-  useEffect(() => {
-    if (midi && currentTime > midi.duration) {
-      console.log("Current time: ", currentTime);
-      processRef.current?.kill();
-    } else {
-      console.log("Midi duration: ", midi?.duration);
-      console.log("Current time: ", currentTime);
-    }
-  }, [currentTime, midi]);
 
   const handleConnectClick = async () => {
     if (device) {
@@ -76,14 +66,14 @@ export function ADB() {
       }
       console.log(command);
       setIsSending(true);
-      await writerRef.current.write(new Consumable(new TextEncoder().encode(command)));
+      writerRef.current.write(new Consumable(new TextEncoder().encode(command)));
 
       // Update current time
       let elapsedTime = 0;
       const interval = setInterval(() => {
         elapsedTime += 10;
         setCurrentTime(elapsedTime / 1000); // Convert to seconds
-        if (elapsedTime >= midi?.duration) {
+        if (elapsedTime >= totalDuration) {
           clearInterval(interval);
           setIsSending(false);
         }
@@ -122,7 +112,7 @@ export function ADB() {
 
   useEffect(() => {
     // Load a default MIDI file on component mount
-    loadMidiFile('/midi/ending.mid');
+    loadMidiFile('/midi/zelda-idk.mid');
 
   }, [loadMidiFile]);
 
@@ -151,7 +141,7 @@ export function ADB() {
         {/* <CardTitle>Archive Product</CardTitle> */}
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
           <div className="flex-1">
             <h3 className="text-lg font-bold mb-4">ADB Device</h3>
 
@@ -177,6 +167,8 @@ export function ADB() {
             {device && <p className="text-green-600">Selected device: {device.serial}</p>}
 
             <Button id="send-sequence-button" onClick={handleSendSequenceClick} disabled={!ready || isSending} className="mb-4 w-full">Send Sequence</Button>
+            <p>Current time: {currentTime}</p>
+            <p>Midi duration: {midi?.duration}</p>
 
             <div {...getRootProps()} className={cn('h-32 p-4 border-dashed border-2 rounded-md mb-4 flex items-center justify-center', isDragActive ? 'border-blue-500 bg-blue-100' : 'border-gray-300', { 'cursor-pointer': device })}>
               <input {...getInputProps()} />

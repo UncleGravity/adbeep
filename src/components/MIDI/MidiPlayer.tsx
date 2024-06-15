@@ -37,7 +37,7 @@ const MidiPlayer: React.FC<MidiPlayerProps> = ({ midi, highlightChannel = 0 }) =
           const noteHeight = height / 128;
           const noteWidth = note.duration * pixelsPerSecond;
 
-          ctx.fillStyle = track.channel === highlightChannel ? 'red' : 'black';
+          ctx.fillStyle = trackIndex === highlightChannel ? 'red' : 'black';
           ctx.fillRect(x, y, noteWidth, noteHeight);
         });
       });
@@ -89,7 +89,7 @@ const MidiPlayer: React.FC<MidiPlayerProps> = ({ midi, highlightChannel = 0 }) =
       setIsPlaying(true);
       setIsPaused(false);
 
-      Tone.getTransport().scheduleRepeat((time) => {
+      Tone.getTransport().scheduleRepeat(() => {
         setCurrentTime(Tone.getTransport().seconds);
       }, "0.1");
     }

@@ -1,0 +1,213 @@
+import { useCallback, useState, useRef, useEffect } from "react";
+import { useDropzone } from 'react-dropzone';
+import { Midi, Note } from '@tonejs/midi';
+import useAdbDevice from "../hooks/useAdbDevice";
+import { ReadableWritablePair, WritableStream, DecodeUtf8Stream, Consumable, WritableStreamDefaultWriter } from "@yume-chan/stream-extra";
+import { Adb, AdbSubprocessProtocol } from "@yume-chan/adb";
+import { Button } from "@/components/ui/button"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { convertMidiToSequence, MARIO_THEME } from "@/lib/utils";
+import { toast } from "sonner"
+import MidiVisualizer from "@/components/MIDI/MidiVisualizer";
+import { TerminalDrawer } from "@/components/Shell/TerminalDrawer";
+
+export function ADB() {
+  const { device, connectDevice } = useAdbDevice();
+  const [adb, setAdb] = useState<Adb | null>(null);
+  const [ready, setReady] = useState(false);
+  const [midi, setMidi] = useState<Midi | null>(null);
+  const [sequence, setSequence] = useState<[number, number][]>(MARIO_THEME);
+  const processRef = useRef<AdbSubprocessProtocol | null>(null);
+  const writerRef = useRef<WritableStreamDefaultWriter<Consumable<Uint8Array>> | null>(null);
+  const [midiFileName, setMidiFileName] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [selectedTrack, setSelectedTrack] = useState<number>(0);
+
+  useEffect(() => {
+    if (midi && currentTime > midi.duration) {
+      console.log("Current time: ", currentTime);
+      processRef.current?.kill();
+    } else {
+      console.log("Midi duration: ", midi?.duration);
+      console.log("Current time: ", currentTime);
+    }
+  }, [currentTime, midi]);
+
+  const handleConnectClick = async () => {
+    if (device) {
+      console.log("Device already connected");
+      toast.error("Device already connected");
+      return;
+    }
+
+    const adb = await connectDevice();
+    if (adb) {
+      setAdb(adb);
+      console.log("Spawning process");
+      const process = await adb.subprocess.spawn("/vendor/bin/hw/vendor.hammerhead.testapp.sh");
+      console.log("Process spawned");
+      processRef.current = process;
+
+      processRef.current.stdout.pipeThrough(new DecodeUtf8Stream()).pipeTo(
+        new WritableStream<string>({
+          async write(chunk) {
+            console.log(chunk);
+            if (chunk.includes("^C to exit.") && processRef.current) {
+              writerRef.current = processRef.current.stdin.getWriter();
+              setReady(true);
+            }
+          },
+        }),
+      );
+    }
+  };
+
+  const handleSendSequenceClick = async () => {
+    if (processRef.current && writerRef.current && midi) {
+      let command = 'v\n';
+      let totalDuration = 0;
+
+      for (const [frequency, duration] of sequence) {
+        command += `b\n${frequency}\n${duration}\n`;
+        totalDuration += duration;
+      }
+      console.log(command);
+      setIsSending(true);
+      await writerRef.current.write(new Consumable(new TextEncoder().encode(command)));
+
+      // Update current time
+      let elapsedTime = 0;
+      const interval = setInterval(() => {
+        elapsedTime += 10;
+        setCurrentTime(elapsedTime / 1000); // Convert to seconds
+        if (elapsedTime >= midi?.duration) {
+          clearInterval(interval);
+          setIsSending(false);
+        }
+      }, 10);
+    } else {
+      console.log("process not ready");
+    }
+  };
+
+  const loadMidiFile = useCallback(async (filePath: string) => {
+    const response = await fetch(filePath);
+    const arrayBuffer = await response.arrayBuffer();
+    const currentMidi = new Midi(arrayBuffer);
+    setMidi(currentMidi);
+
+    console.log("TRACKS: ", currentMidi.tracks);
+
+    // Find the first non-empty track
+    const firstNonEmptyTrackIndex = currentMidi.tracks.findIndex(track => track.notes.length > 0);
+    if (firstNonEmptyTrackIndex !== -1) {
+      const sequence = convertMidiToSequence(currentMidi.tracks[firstNonEmptyTrackIndex].notes);
+      setSequence(sequence);
+      setSelectedTrack(firstNonEmptyTrackIndex);
+      console.log(`Auto-selected Track: ${firstNonEmptyTrackIndex}`);
+      console.log(sequence);
+    }
+  }, []);
+
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      setMidiFileName(file.name);
+      await loadMidiFile(URL.createObjectURL(file));
+    }
+  }, [loadMidiFile]);
+
+  useEffect(() => {
+    // Load a default MIDI file on component mount
+    loadMidiFile('/midi/ending.mid');
+
+  }, [loadMidiFile]);
+
+  const handleTrackChange = (value: string) => {
+    const trackNumber = parseInt(value, 10);
+    setSelectedTrack(trackNumber);
+    if (midi) {
+      const newSequence = convertMidiToSequence(midi.tracks[trackNumber].notes);
+      console.log("Selected Track: ", trackNumber);
+      console.log(newSequence);
+      setSequence(newSequence);
+    }
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/octet-stream': ['.mid', '.midi'],
+    },
+    maxFiles: 1,
+  });
+
+  return (
+    <Card className="p-4">
+      <CardHeader>
+        {/* <CardTitle>Archive Product</CardTitle> */}
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <h3 className="text-lg font-bold mb-4">ADB Device</h3>
+
+            <div className="flex gap-4 w-full mb-4">
+
+              <div className="flex-1">
+                <Button id="connect-button" onClick={handleConnectClick}>Select Device</Button>
+              </div>
+
+              <div className="flex-1">
+                <TerminalDrawer adb={adb} />
+              </div>
+
+            </div>
+
+            <div className="status-badge p-2 rounded-md mb-4">
+              <span className={`text-green-800 ${device ? 'text-green-00' : 'text-red-500'}`}>
+                ●
+              </span>
+              {device ? ' Connected' : ' Disconnected'}
+            </div>
+
+            {device && <p className="text-green-600">Selected device: {device.serial}</p>}
+
+            <Button id="send-sequence-button" onClick={handleSendSequenceClick} disabled={!ready || isSending} className="mb-4 w-full">Send Sequence</Button>
+
+            <div {...getRootProps()} className={cn('h-32 p-4 border-dashed border-2 rounded-md mb-4 flex items-center justify-center', isDragActive ? 'border-blue-500 bg-blue-100' : 'border-gray-300', { 'cursor-pointer': device })}>
+              <input {...getInputProps()} />
+              <p className="text-sm text-gray-500 text-center">
+                {midiFileName ? midiFileName : 'Drag & drop a MIDI file here, or click to select one'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <h3 className="text-lg font-bold mb-4">MIDI</h3>
+            {midi && (
+              <>
+                <Select value={selectedTrack.toString()} onValueChange={handleTrackChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Track" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {midi.tracks.map((track, index) => (
+                      <SelectItem key={index} value={index.toString()} disabled={track.notes.length === 0}>
+                        {`Track ${index} ${track.notes.length === 0 ? '(Empty)' : ''}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <MidiVisualizer midi={midi} currentTime={currentTime} highlightChannel={selectedTrack} />
+              </>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

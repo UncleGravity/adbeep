@@ -14,6 +14,10 @@ export function convertMidiToSequence(notes: Note[]): [number, number][] {
   const sequence: [number, number][] = [];
   let lastTime = 0;
 
+  if (notes.length > 0 && notes[0].time > 0) {
+    sequence.push([0, Math.floor(notes[0].time * 1000)]);
+  }
+
   notes.forEach(note => {
     const silenceDuration = Math.floor(note.time - lastTime);
     if (silenceDuration > 0) {

@@ -1,10 +1,10 @@
-import { ADB } from './ADB'
+import { ADB } from './components/ADB'
 // import ADBe from './ADBe'
 
 function App() {
   return (
     <div className="container mx-auto p-4 flex flex-col items-center">
-      <h1 className="text-2xl font-bold mb-4">ADBeeper2</h1>
+      {/* <h1 className="text-2xl font-bold mb-4">ADBeeper2</h1> */}
       <ADB />
     </div>
   )

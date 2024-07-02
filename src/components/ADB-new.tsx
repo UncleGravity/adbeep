@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useDropzone } from 'react-dropzone';
 import { Midi } from '@tonejs/midi';
 import useAdbDevice from "../hooks/useAdbDevice";
@@ -25,7 +25,7 @@ export function ADB() {
   const [isSending, setIsSending] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [selectedTrack, setSelectedTrack] = useState<number>(0);
-  const [copiedText, copyToClipboard] = useCopyToClipboard();
+  const [_, copyToClipboard] = useCopyToClipboard(); // Correct destructuring if it returns an object
   const [isCopied, setIsCopied] = useState(false);
 
   const demoFiles = [
@@ -151,19 +151,21 @@ export function ADB() {
     maxFiles: 1,
   });
 
-  const getAdbCommand = () => {
+  const getAdbCommand = useCallback(() => {
     if (sequence.length > 0) {
       const tones = sequence.flatMap(([frequency, duration]) => [duration, frequency === 0 ? -1 : frequency]);
       return `adb shell am broadcast -a io.hammerhead.action.CMD_LINE_AUDIO_ALERT --eia tones ${tones.join(',')}`;
     }
     return '';
-  };
+  }, [sequence]); // Ensure dependencies are correctly listed
 
   const handleCopyCommand = useCallback(() => {
-    copyToClipboard(getAdbCommand());
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000); // Reset after 2 seconds
-  }, [copyToClipboard, getAdbCommand]);
+    if (copyToClipboard) {
+      copyToClipboard(getAdbCommand());
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    }
+  }, [copyToClipboard, getAdbCommand]); // Ensure dependencies are correctly listed
 
   return (
     <Card className="p-4">

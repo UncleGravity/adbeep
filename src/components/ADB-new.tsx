@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { useDropzone } from 'react-dropzone';
 import { Midi } from '@tonejs/midi';
 import useAdbDevice from "../hooks/useAdbDevice";
@@ -12,6 +12,7 @@ import { convertMidiToSequence, MARIO_THEME } from "@/lib/utils";
 import { toast } from "sonner"
 import MidiVisualizer from "@/components/MIDI/MidiVisualizer";
 import { TerminalDrawer } from "@/components/Shell/TerminalDrawer";
+import { useCopyToClipboard } from "@uidotdev/usehooks";
 
 export function ADB() {
   const { device, connectDevice } = useAdbDevice();
@@ -24,6 +25,8 @@ export function ADB() {
   const [isSending, setIsSending] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [selectedTrack, setSelectedTrack] = useState<number>(0);
+  const [copiedText, copyToClipboard] = useCopyToClipboard();
+  const [isCopied, setIsCopied] = useState(false);
 
   const demoFiles = [
     "1up.mid",
@@ -148,6 +151,20 @@ export function ADB() {
     maxFiles: 1,
   });
 
+  const getAdbCommand = () => {
+    if (sequence.length > 0) {
+      const tones = sequence.flatMap(([frequency, duration]) => [duration, frequency === 0 ? -1 : frequency]);
+      return `adb shell am broadcast -a io.hammerhead.action.CMD_LINE_AUDIO_ALERT --eia tones ${tones.join(',')}`;
+    }
+    return '';
+  };
+
+  const handleCopyCommand = useCallback(() => {
+    copyToClipboard(getAdbCommand());
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000); // Reset after 2 seconds
+  }, [copyToClipboard, getAdbCommand]);
+
   return (
     <Card className="p-4">
       <CardHeader>
@@ -186,6 +203,15 @@ export function ADB() {
                 <h4 className="font-bold">Output:</h4>
                 <pre className="whitespace-pre-wrap">{output}</pre>
               </div>
+            )}
+
+            {midi && (
+              <Button 
+                onClick={handleCopyCommand}
+                className="mb-4 w-full"
+              >
+                {isCopied ? 'Copied!' : 'Copy ADB Command'}
+              </Button>
             )}
 
             <h3 className="text-lg font-bold">Select MIDI File</h3>

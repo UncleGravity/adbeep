@@ -12,20 +12,19 @@ export function midiNoteToFrequency(midiNote: number): number {
 
 export function convertMidiToSequence(notes: Note[]): [number, number][] {
   const sequence: [number, number][] = [];
-  let lastTime = 0;
-
-  if (notes.length > 0 && notes[0].time > 0) {
-    sequence.push([0, Math.floor(notes[0].time * 1000)]);
-  }
+  let lastEndTime = 0;
 
   notes.forEach(note => {
-    const silenceDuration = Math.floor(note.time - lastTime);
-    if (silenceDuration > 0) {
-      sequence.push([0, silenceDuration * 1000]);
+    // Add silence before the note if needed
+    if (note.time > lastEndTime) {
+      sequence.push([0, Math.floor((note.time - lastEndTime) * 1000)]);
     }
+
+    // Add the note
     const frequency = Math.floor(midiNoteToFrequency(note.midi));
     sequence.push([frequency, Math.floor(note.duration * 1000)]);
-    lastTime = note.time + note.duration;
+
+    lastEndTime = note.time + note.duration;
   });
 
   return sequence;

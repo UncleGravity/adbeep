@@ -1,9 +1,9 @@
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useDropzone } from 'react-dropzone';
 import { Midi } from '@tonejs/midi';
 import useAdbDevice from "../hooks/useAdbDevice";
-import { WritableStream, DecodeUtf8Stream, Consumable } from "@yume-chan/stream-extra";
-import { Adb, AdbSubprocessProtocol } from "@yume-chan/adb";
+import { WritableStream, DecodeUtf8Stream } from "@yume-chan/stream-extra";
+import { Adb } from "@yume-chan/adb";
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
